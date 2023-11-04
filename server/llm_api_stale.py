@@ -7,6 +7,8 @@
 import sys
 import os
 
+from configs import DEFAULT_BIND_HOST
+
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 import subprocess
@@ -23,13 +25,13 @@ logging.basicConfig(format=LOG_FORMAT)
 parser = argparse.ArgumentParser()
 # ------multi worker-----------------
 parser.add_argument('--model-path-address',
-                    default="THUDM/chatglm2-6b@localhost@20002",
+                    default="/model/chatglm3-6b-32k@" + DEFAULT_BIND_HOST + "@21002",
                     nargs="+",
                     type=str,
                     help="model path, host, and port, formatted as model-path@host@port")
 # ---------------controller-------------------------
 
-parser.add_argument("--controller-host", type=str, default="localhost")
+parser.add_argument("--controller-host", type=str, default=DEFAULT_BIND_HOST)
 parser.add_argument("--controller-port", type=int, default=21001)
 parser.add_argument(
     "--dispatch-method",
@@ -41,12 +43,12 @@ controller_args = ["controller-host", "controller-port", "dispatch-method"]
 
 # ----------------------worker------------------------------------------
 
-parser.add_argument("--worker-host", type=str, default="localhost")
+parser.add_argument("--worker-host", type=str, default=DEFAULT_BIND_HOST)
 parser.add_argument("--worker-port", type=int, default=21002)
 # parser.add_argument("--worker-address", type=str, default="http://localhost:21002")
-# parser.add_argument(
-#     "--controller-address", type=str, default="http://localhost:21001"
-# )
+parser.add_argument(
+    "--controller-address", type=str, default=f"http://{DEFAULT_BIND_HOST}:21001"
+)
 parser.add_argument(
     "--model-path",
     type=str,
@@ -136,7 +138,7 @@ worker_args = [
 ]
 # -----------------openai server---------------------------
 
-parser.add_argument("--server-host", type=str, default="localhost", help="host name")
+parser.add_argument("--server-host", type=str, default=DEFAULT_BIND_HOST, help="host name")
 parser.add_argument("--server-port", type=int, default=8888, help="port number")
 parser.add_argument(
     "--allow-credentials", action="store_true", help="allow credentials"

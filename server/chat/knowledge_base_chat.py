@@ -36,6 +36,14 @@ async def knowledge_base_chat(query: str = Body(..., description="用户输入",
                             prompt_name: str = Body("default", description="使用的prompt模板名称(在configs/prompt_config.py中配置)"),
                             request: Request = None,
                         ):
+
+    # knowledge_base_name = DEFAULT_KNOWLEDGE_BASE
+    # top_k = VECTOR_SEARCH_TOP_K
+    # score_threshold = SCORE_THRESHOLD
+    # model_name = LLM_MODEL
+    # temperature = TEMPERATURE
+    # prompt_name = "default"
+
     kb = KBServiceFactory.get_service_by_name(knowledge_base_name)
     if kb is None:
         return BaseResponse(code=404, msg=f"未找到知识库 {knowledge_base_name}")

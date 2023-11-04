@@ -4,7 +4,7 @@ from streamlit_chatbox import *
 from datetime import datetime
 import os
 from configs import (TEMPERATURE, HISTORY_LEN, PROMPT_TEMPLATES,
-                     DEFAULT_KNOWLEDGE_BASE, DEFAULT_SEARCH_ENGINE, SUPPORT_AGENT_MODEL)
+                     DEFAULT_KNOWLEDGE_BASE, DEFAULT_SEARCH_ENGINE, SUPPORT_AGENT_MODEL, HASADMIN, DIALOGUE_MODEL)
 from typing import List, Dict
 
 
@@ -40,7 +40,7 @@ def dialogue_page(api: ApiRequest, is_lite: bool = False):
     if not chat_box.chat_inited:
         default_model = api.get_default_llm_model()[0]
         st.toast(
-            f"欢迎使用 [`Langchain-Chatchat`](https://github.com/chatchat-space/Langchain-Chatchat) ! \n\n"
+            f"欢迎使用 Ontoweb-LLM ! \n\n"
             f"当前运行的模型`{default_model}`, 您可以开始提问了."
         )
         chat_box.init_session()
@@ -56,17 +56,20 @@ def dialogue_page(api: ApiRequest, is_lite: bool = False):
                     text = f"{text} 当前知识库： `{cur_kb}`。"
             st.toast(text)
 
-        dialogue_modes = ["LLM 对话",
-                            "知识库问答",
-                            "搜索引擎问答",
-                            "自定义Agent问答",
-                            ]
-        dialogue_mode = st.selectbox("请选择对话模式：",
-                                     dialogue_modes,
-                                     index=0,
-                                     on_change=on_mode_change,
-                                     key="dialogue_mode",
-                                     )
+        if HASADMIN:  # admin可选
+            dialogue_modes = ["LLM 对话",
+                                "知识库问答",
+                                "搜索引擎问答",
+                                "自定义Agent问答",
+                                ]
+            dialogue_mode = st.selectbox("请选择对话模式：",
+                                         dialogue_modes,
+                                         index=0,
+                                         on_change=on_mode_change,
+                                         key="dialogue_mode",
+                                         )
+        else:
+            dialogue_mode = DIALOGUE_MODEL
 
         def on_llm_change():
             if llm_model:
@@ -92,13 +95,16 @@ def dialogue_page(api: ApiRequest, is_lite: bool = False):
                 available_models.append(k)
         llm_models = running_models + available_models
         index = llm_models.index(st.session_state.get("cur_llm_model", api.get_default_llm_model()[0]))
-        llm_model = st.selectbox("选择LLM模型：",
-                                 llm_models,
-                                 index,
-                                 format_func=llm_model_format_func,
-                                 on_change=on_llm_change,
-                                 key="llm_model",
-                                 )
+        if HASADMIN:  # admin可选
+            llm_model = st.selectbox("选择LLM模型：",
+                                     llm_models,
+                                     index,
+                                     format_func=llm_model_format_func,
+                                     on_change=on_llm_change,
+                                     key="llm_model",
+                                     )
+        else:
+            llm_model = LLM_MODEL
         if (st.session_state.get("prev_llm_model") != llm_model
                 and not is_lite
                 and not llm_model in config_models.get("online", {})
@@ -136,8 +142,12 @@ def dialogue_page(api: ApiRequest, is_lite: bool = False):
             key="prompt_template_select",
         )
         prompt_template_name = st.session_state.prompt_template_select
-        temperature = st.slider("Temperature：", 0.0, 1.0, TEMPERATURE, 0.05)
-        history_len = st.number_input("历史对话轮数：", 0, 20, HISTORY_LEN)
+        if HASADMIN:  # admin可选
+            temperature = st.slider("Temperature：", 0.0, 1.0, TEMPERATURE, 0.05)
+            history_len = st.number_input("历史对话轮数：", 0, 20, HISTORY_LEN)
+        else:
+            temperature = TEMPERATURE
+            history_len = HISTORY_LEN
 
         def on_kb_change():
             st.toast(f"已加载知识库： {st.session_state.selected_kb}")
@@ -148,17 +158,22 @@ def dialogue_page(api: ApiRequest, is_lite: bool = False):
                 index = 0
                 if DEFAULT_KNOWLEDGE_BASE in kb_list:
                     index = kb_list.index(DEFAULT_KNOWLEDGE_BASE)
-                selected_kb = st.selectbox(
-                    "请选择知识库：",
-                    kb_list,
-                    index=index,
-                    on_change=on_kb_change,
-                    key="selected_kb",
-                )
-                kb_top_k = st.number_input("匹配知识条数：", 1, 20, VECTOR_SEARCH_TOP_K)
+                if HASADMIN:  # admin可选
+                    selected_kb = st.selectbox(
+                        "请选择知识库：",
+                        kb_list,
+                        index=index,
+                        on_change=on_kb_change,
+                        key="selected_kb",
+                    )
+                    kb_top_k = st.number_input("匹配知识条数：", 1, 20, VECTOR_SEARCH_TOP_K)
+                    ## Bge 模型会超过1
+                    score_threshold = st.slider("知识匹配分数阈值：", 0.0, 2.0, float(SCORE_THRESHOLD), 0.01)
+                else:
+                    selected_kb = DEFAULT_KNOWLEDGE_BASE
+                    kb_top_k = VECTOR_SEARCH_TOP_K
+                    score_threshold = SCORE_THRESHOLD
 
-                ## Bge 模型会超过1
-                score_threshold = st.slider("知识匹配分数阈值：", 0.0, 2.0, float(SCORE_THRESHOLD), 0.01)
 
         elif dialogue_mode == "搜索引擎问答":
             search_engine_list = api.list_search_engines()

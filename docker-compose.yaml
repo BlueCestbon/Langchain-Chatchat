@@ -1,0 +1,35 @@
+version: '3'
+services:
+  ontoweb-llm:
+    image: ontoweb-llm:model-cuda12-cudnn8-python310
+    restart: unless-stopped
+    container_name: ontoweb-llm
+    ports:
+      - "50001:8501"
+      - "50002:7861"
+    command:
+      - 'sh'
+      - '-c'
+      - 'sleep 72h'
+#      - 'python startup.py -a > logs/alog.txt 2>&1'
+    networks:
+      - ontoweb
+    working_dir: /mnt/22xiaowei/Lchat/Langchain-Chatchat
+    volumes:
+      - /data/k8s/kubeflow/pipeline/workspace/22xiaowei:/mnt/22xiaowei
+      - /model:/model
+    environment:
+      - CUDA_VISIBLE_DEVICES=0,1
+      - NUM_GPUS=2
+    security_opt:
+      - seccomp:unconfined
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              capabilities: [ gpu ]
+              count: 2
+networks:
+  ontoweb:
+    external: true

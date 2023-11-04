@@ -5,7 +5,7 @@ from webui_pages.dialogue.dialogue import dialogue_page, chat_box
 from webui_pages.knowledge_base.knowledge_base import knowledge_base_page
 import os
 import sys
-from configs import VERSION
+from configs import VERSION, HASADMIN
 from server.utils import api_address
 
 
@@ -17,7 +17,7 @@ if __name__ == "__main__":
     st.set_page_config(
         "Langchain-Chatchat WebUI",
         os.path.join("img", "chatchat_icon_blue_square_v2.png"),
-        initial_sidebar_state="expanded",
+        initial_sidebar_state="expanded",  # expanded, collapsed, auto
         menu_items={
             'Get Help': 'https://github.com/chatchat-space/Langchain-Chatchat',
             'Report a bug': "https://github.com/chatchat-space/Langchain-Chatchat/issues",
@@ -30,11 +30,16 @@ if __name__ == "__main__":
             "icon": "chat",
             "func": dialogue_page,
         },
-        "知识库管理": {
+        # "知识库管理": {
+        #     "icon": "hdd-stack",
+        #     "func": knowledge_base_page,
+        # },
+    }
+    if HASADMIN:  # 管理员可设置
+        pages["知识库管理"] = {
             "icon": "hdd-stack",
             "func": knowledge_base_page,
-        },
-    }
+        }
 
     with st.sidebar:
         st.image(
@@ -62,3 +67,11 @@ if __name__ == "__main__":
 
     if selected_page in pages:
         pages[selected_page]["func"](api=api, is_lite=is_lite)
+
+hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            </style>
+            """
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)

@@ -167,9 +167,11 @@ def create_model_worker_app(log_level: str = "INFO", **kwargs) -> FastAPI:
         else:
             from fastchat.serve.model_worker import app, GptqConfig, AWQConfig, ModelWorker, worker_id
 
-            args.gpus = "0" # GPU的编号,如果有多个GPU，可以设置为"0,1,2,3"
             args.max_gpu_memory = "22GiB"
-            args.num_gpus = 1  # model worker的切分是model并行，这里填写显卡的数量
+            # args.gpus = "0"  # GPU的编号,如果有多个GPU，可以设置为"0,1,2,3"
+            # args.num_gpus = 1  # model worker的切分是model并行，这里填写显卡的数量
+            args.gpus = os.environ["CUDA_VISIBLE_DEVICES"] if "CUDA_VISIBLE_DEVICES" in os.environ else "0"
+            args.num_gpus = int(os.environ["NUM_GPUS"]) if "NUM_GPUS" in os.environ else 1
 
             args.load_8bit = False
             args.cpu_offloading = None
@@ -195,6 +197,8 @@ def create_model_worker_app(log_level: str = "INFO", **kwargs) -> FastAPI:
                     raise ValueError(
                         f"Larger --num-gpus ({args.num_gpus}) than --gpus {args.gpus}!"
                     )
+                print("args.gpus", args.gpus)
+                print("args.num_gpus", args.num_gpus)
                 os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
             gptq_config = GptqConfig(
                 ckpt=args.gptq_ckpt or args.model_path,

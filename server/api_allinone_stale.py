@@ -8,6 +8,21 @@ python server/api_allinone.py --model-path-address model1@host1@port1 model2@hos
 多卡启动：
 python server/api_allinone.py --model-path-address model@host@port --num-gpus 2 --gpus 0,1 --max-gpu-memory 10GiB
 
+
+启动控制器
+nohup python -m fastchat.serve.controller  --host 0.0.0.0  --port 21001  --dispatch-method shortest_queue  >/mnt/22xiaowei/Lchat/Langchain-Chatchat/logs/controller.log 2>&1 &
+
+启动工作器
+python -m fastchat.serve.model_worker  --host 0.0.0.0  --port 21002  --controller-address http://0.0.0.0:21001  --model-path /model/chatglm2-6b-32k  --revision main  --device cuda  --gpus 0,1  --num-gpus 2  --max-gpu-memory 20GiB  --gptq-wbits 16  --gptq-groupsize -1  --limit-worker-concurrency 5  --stream-interval 2  --worker-address http://0.0.0.0:21002  >/mnt/22xiaowei/Lchat/Langchain-Chatchat/logs/worker_chatglm2_6b_32k_0_0_0_0_21002.log
+
+启动openai方式的api
+python -m fastchat.serve.openai_api_server --host 0.0.0.0 --port 7861
+
+以cli模式启动
+python -m fastchat.serve.cli --model-path /model/chatglm3-6b-32k --num-gpus 2 --gpus 0,1
+
+python server/api_allinone_stale.py --num-gpus 2 --gpus 0,1
+
 """
 import sys
 import os
