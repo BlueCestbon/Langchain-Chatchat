@@ -34,7 +34,7 @@ EMBEDDING_DEVICE = "auto"
 EMBEDDING_KEYWORD_FILE = "keywords.txt"
 EMBEDDING_MODEL_OUTPUT_PATH = "output"
 # LLM 名称
-LLM_MODEL = "chatglm3-6b-32k"
+LLM_MODEL = "chatglm2-6b-32k"
 # AgentLM模型的名称 (可以不指定，指定之后就锁定进入Agent之后的Chain的模型，不指定就是LLM_MODEL)
 Agent_MODEL = None
 # LLM 运行设备。设为"auto"会自动检测，也可手动设定为"cuda","mps","cpu"其中之一。

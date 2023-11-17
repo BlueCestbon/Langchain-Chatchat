@@ -3,8 +3,8 @@ langchain-experimental>=0.0.30
 fschat[model_worker]==0.2.32
 xformers>=0.0.22.post4
 openai>=0.28.1
-sentence_transformers
-transformers==4.34
+sentence_transformers>=2.2.2
+transformers>=4.34
 torch>=2.0.1 # 推荐2.1
 torchvision
 torchaudio

@@ -69,7 +69,8 @@ def list_files_from_folder(kb_name: str):
 
 
 LOADER_DICT = {"UnstructuredHTMLLoader": ['.html'],
-               "UnstructuredMarkdownLoader": ['.md'],
+               # "UnstructuredMarkdownLoader": ['.md'],
+               "CustomMDLoader": ['.md'],
                "CustomJSONLoader": [".json"],
                "CSVLoader": [".csv"],
                # "FilteredCSVLoader": [".csv"], # 需要自己指定，目前还没有支持
@@ -151,7 +152,7 @@ def get_loader(loader_name: str, file_path_or_content: Union[str, bytes, io.Stri
     根据loader_name和文件路径或内容返回文档加载器。
     '''
     try:
-        if loader_name in ["RapidOCRPDFLoader", "RapidOCRLoader","FilteredCSVLoader"]:
+        if loader_name in ["RapidOCRPDFLoader", "RapidOCRLoader", "FilteredCSVLoader", "CustomMDLoader"]:
             document_loaders_module = importlib.import_module('document_loaders')
         else:
             document_loaders_module = importlib.import_module('langchain.document_loaders')
@@ -202,6 +203,11 @@ def make_text_splitter(
         if splitter_name == "MarkdownHeaderTextSplitter":  # MarkdownHeaderTextSplitter特殊判定
             headers_to_split_on = text_splitter_dict[splitter_name]['headers_to_split_on']
             text_splitter = langchain.text_splitter.MarkdownHeaderTextSplitter(
+                headers_to_split_on=headers_to_split_on)
+        elif splitter_name == "CustomMarkDownTextSplitter":
+            headers_to_split_on = text_splitter_dict[splitter_name]['headers_to_split_on']
+            from text_splitter.custom_md_text_splitter import CustomMarkDownTextSplitter
+            text_splitter = CustomMarkDownTextSplitter(
                 headers_to_split_on=headers_to_split_on)
         else:
 

@@ -90,10 +90,21 @@ text_splitter_dict = {
                 ("####", "head4"),
             ]
     },
+    "CustomMarkDownTextSplitter": {
+        "source": "huggingface",  # 选择tiktoken则使用openai的方法
+        "tokenizer_name_or_path": "",
+        "headers_to_split_on":
+            [
+                ("#", "head1"),
+                ("##", "head2"),
+                ("###", "head3"),
+                ("####", "head4"),
+            ]
+    },
 }
 
 # TEXT_SPLITTER 名称
-TEXT_SPLITTER_NAME = "ChineseRecursiveTextSplitter"
+TEXT_SPLITTER_NAME = "CustomMarkDownTextSplitter"
 
 # Embedding模型定制词语的词表文件
 EMBEDDING_KEYWORD_FILE = "embedding_keywords.txt"

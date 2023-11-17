@@ -15,6 +15,12 @@ nohup python -m fastchat.serve.controller  --host 0.0.0.0  --port 21001  --dispa
 启动工作器
 python -m fastchat.serve.model_worker  --host 0.0.0.0  --port 21002  --controller-address http://0.0.0.0:21001  --model-path /model/chatglm2-6b-32k  --revision main  --device cuda  --gpus 0,1  --num-gpus 2  --max-gpu-memory 20GiB  --gptq-wbits 16  --gptq-groupsize -1  --limit-worker-concurrency 5  --stream-interval 2  --worker-address http://0.0.0.0:21002  >/mnt/22xiaowei/Lchat/Langchain-Chatchat/logs/worker_chatglm2_6b_32k_0_0_0_0_21002.log
 
+python -m fastchat.serve.model_worker  --host 0.0.0.0  --port 20003  --controller-address http://0.0.0.0:20001 \
+ --model-path /model/chatglm2-6b-32k  --revision main  --device cuda  --gpus 0,1  --num-gpus 2  --max-gpu-memory 20GiB \
+   --gptq-wbits 16  --gptq-groupsize -1  --limit-worker-concurrency 5  --stream-interval 2  \
+   --worker-address http://0.0.0.0:20003  >/mnt/Lchat/Langchain-Chatchat-dev/logs/worker_chatglm2_6b_32k_0_0_0_0_20003.log
+
+
 启动openai方式的api
 python -m fastchat.serve.openai_api_server --host 0.0.0.0 --port 7861
 

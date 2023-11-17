@@ -7,6 +7,9 @@ log_verbose = True
 langchain.verbose = True
 HASADMIN = True
 
+# 是否保存聊天记录
+SAVE_CHAT_HISTORY = True
+
 # 通常情况下不需要更改以下内容
 
 # 日志格式
