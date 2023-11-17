@@ -1,14 +1,16 @@
 from langchain.memory import ConversationBufferWindowMemory
+
+from server.agent.custom_agent.ChatGLM3Agent import initialize_glm3_agent
 from server.agent.tools_select import tools, tool_names
 from server.agent.callbacks import CustomAsyncIteratorCallbackHandler, Status
-from langchain.agents import AgentExecutor, LLMSingleActionAgent, initialize_agent, BaseMultiActionAgent
+from langchain.agents import LLMSingleActionAgent, AgentExecutor
 from server.agent.custom_template import CustomOutputParser, CustomPromptTemplate
 from fastapi import Body
 from fastapi.responses import StreamingResponse
-from configs import LLM_MODEL, TEMPERATURE, HISTORY_LEN, Agent_MODEL
+from configs import LLM_MODELS, TEMPERATURE, HISTORY_LEN, Agent_MODEL
 from server.utils import wrap_done, get_ChatOpenAI, get_prompt_template
 from langchain.chains import LLMChain
-from typing import AsyncIterable, Optional, Dict
+from typing import AsyncIterable, Optional
 import asyncio
 from typing import List
 from server.chat.utils import History
@@ -26,7 +28,7 @@ async def agent_chat(query: str = Body(..., description="用户输入", examples
                                                         "content": "使用天气查询工具查询到今天北京多云，10-14摄氏度，东北风2级，易感冒"}]]
                                                    ),
                      stream: bool = Body(False, description="流式输出"),
-                     model_name: str = Body(LLM_MODEL, description="LLM 模型名称。"),
+                     model_name: str = Body(LLM_MODELS[0], description="LLM 模型名称。"),
                      temperature: float = Body(TEMPERATURE, description="LLM 采样温度", ge=0.0, le=1.0),
                      max_tokens: Optional[int] = Body(None, description="限制LLM生成Token数量，默认None代表模型最大值"),
                      prompt_name: str = Body("default",
@@ -38,7 +40,7 @@ async def agent_chat(query: str = Body(..., description="用户输入", examples
     async def agent_chat_iterator(
             query: str,
             history: Optional[List[History]],
-            model_name: str = LLM_MODEL,
+            model_name: str = LLM_MODELS[0],
             prompt_name: str = prompt_name,
     ) -> AsyncIterable[str]:
         callback = CustomAsyncIteratorCallbackHandler()
@@ -73,12 +75,6 @@ async def agent_chat(query: str = Body(..., description="用户输入", examples
         )
         output_parser = CustomOutputParser()
         llm_chain = LLMChain(llm=model, prompt=prompt_template_agent)
-        agent = LLMSingleActionAgent(
-            llm_chain=llm_chain,
-            output_parser=output_parser,
-            stop=["\nObservation:", "Observation:", "<|im_end|>", "<|observation|>"],  # Qwen模型中使用这个
-            allowed_tools=tool_names,
-        )
         # 把history转成agent的memory
         memory = ConversationBufferWindowMemory(k=HISTORY_LEN * 2)
         for message in history:
@@ -89,11 +85,30 @@ async def agent_chat(query: str = Body(..., description="用户输入", examples
             else:
                 # 添加AI消息
                 memory.chat_memory.add_ai_message(message.content)
-        agent_executor = AgentExecutor.from_agent_and_tools(agent=agent,
-                                                            tools=tools,
-                                                            verbose=True,
-                                                            memory=memory,
-                                                            )
+
+        if "chatglm3" in model_container.MODEL.model_name:
+            agent_executor = initialize_glm3_agent(
+                llm=model,
+                tools=tools,
+                callback_manager=None,
+                # Langchain Prompt is not constructed directly here, it is constructed inside the GLM3 agent.
+                prompt=prompt_template,
+                input_variables=["input", "intermediate_steps", "history"],
+                memory=memory,
+                verbose=True,
+            )
+        else:
+            agent = LLMSingleActionAgent(
+                llm_chain=llm_chain,
+                output_parser=output_parser,
+                stop=["\nObservation:", "Observation"],
+                allowed_tools=tool_names,
+            )
+            agent_executor = AgentExecutor.from_agent_and_tools(agent=agent,
+                                                                tools=tools,
+                                                                verbose=True,
+                                                                memory=memory,
+                                                                )
         while True:
             try:
                 task = asyncio.create_task(wrap_done(

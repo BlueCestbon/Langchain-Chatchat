@@ -4,15 +4,15 @@ from typing import List
 from fastapi import FastAPI
 from pathlib import Path
 import asyncio
-from configs import (LLM_MODEL, LLM_DEVICE, EMBEDDING_DEVICE,
+from configs import (LLM_MODELS, LLM_DEVICE, EMBEDDING_DEVICE,
                      MODEL_PATH, MODEL_ROOT_PATH, ONLINE_LLM_MODEL, logger, log_verbose,
                      FSCHAT_MODEL_WORKERS, HTTPX_DEFAULT_TIMEOUT)
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from langchain.chat_models import ChatOpenAI, AzureChatOpenAI, ChatAnthropic
+from langchain.chat_models import ChatOpenAI
 from langchain.llms import OpenAI, AzureOpenAI, Anthropic
 import httpx
-from typing import Literal, Optional, Callable, Generator, Dict, Any, Awaitable, Union
+from typing import Literal, Optional, Callable, Generator, Dict, Any, Awaitable, Union, Tuple
 
 
 async def wrap_done(fn: Awaitable, event: asyncio.Event):
@@ -342,14 +342,14 @@ def list_embed_models() -> List[str]:
 def list_config_llm_models() -> Dict[str, Dict]:
     '''
     get configured llm models with different types.
-    return [(model_name, config_type), ...]
+    return {config_type: {model_name: config}, ...}
     '''
-    workers = list(FSCHAT_MODEL_WORKERS)
-    if LLM_MODEL not in workers:
-        workers.insert(0, LLM_MODEL)
+    workers = FSCHAT_MODEL_WORKERS.copy()
+    workers.pop("default", None)
+
     return {
-        "local": MODEL_PATH["llm_model"],
-        "online": ONLINE_LLM_MODEL,
+        "local": MODEL_PATH["llm_model"].copy(),
+        "online": ONLINE_LLM_MODEL.copy(),
         "worker": workers,
     }
 
@@ -407,7 +407,10 @@ def get_model_worker_config(model_name: str = None) -> dict:
                              exc_info=e if log_verbose else None)
     # 本地模型
     if model_name in MODEL_PATH["llm_model"]:
-        config["model_path"] = get_model_path(model_name)
+        path = get_model_path(model_name)
+        config["model_path"] = path
+        if path and os.path.isdir(path):
+            config["model_path_exists"] = True
         config["device"] = llm_device(config.get("device"))
     return config
 
@@ -431,7 +434,7 @@ def fschat_controller_address() -> str:
     return f"http://{host}:{port}"
 
 
-def fschat_model_worker_address(model_name: str = LLM_MODEL) -> str:
+def fschat_model_worker_address(model_name: str = LLM_MODELS[0]) -> str:
     if model := get_model_worker_config(model_name):  # TODO: depends fastchat
         host = model["host"]
         if host == "0.0.0.0":
@@ -624,7 +627,8 @@ def get_httpx_client(
     })
     for host in os.environ.get("no_proxy", "").split(","):
         if host := host.strip():
-            default_proxies.update({host: None})
+            # default_proxies.update({host: None}) # Origin code
+            default_proxies.update({'all://' + host: None}) # PR 1838 fix, if not add 'all://', httpx will raise error
 
     # merge default proxies with user provided proxies
     if isinstance(proxies, str):
@@ -660,7 +664,7 @@ def get_server_configs() -> Dict:
         TEXT_SPLITTER_NAME,
     )
     from configs.model_config import (
-        LLM_MODEL,
+        LLM_MODELS,
         HISTORY_LEN,
         TEMPERATURE,
     )
@@ -696,3 +700,19 @@ def load_local_embeddings(model: str = None, device: str = embedding_device()):
 
     model = model or EMBEDDING_MODEL
     return embeddings_pool.load_embeddings(model=model, device=device)
+
+
+def get_temp_dir(id: str = None) -> Tuple[str, str]:
+    '''
+    创建一个临时目录，返回（路径，文件夹名称）
+    '''
+    from configs.basic_config import BASE_TEMP_DIR
+    import tempfile
+
+    if id is not None: # 如果指定的临时目录已存在，直接返回
+        path = os.path.join(BASE_TEMP_DIR, id)
+        if os.path.isdir(path):
+            return path, id
+
+    path = tempfile.mkdtemp(dir=BASE_TEMP_DIR)
+    return path, os.path.basename(path)
