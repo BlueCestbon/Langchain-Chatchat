@@ -20,7 +20,7 @@ from langchain.docstore.document import Document
 from langchain.text_splitter import TextSplitter
 from pathlib import Path
 from server.utils import run_in_thread_pool, get_model_worker_config
-import io
+import json
 from typing import List, Union,Dict, Tuple, Generator
 import chardet
 
@@ -54,30 +54,42 @@ def list_kbs_from_folder():
 
 
 def list_files_from_folder(kb_name: str):
-    def is_skiped_path(path: str): # 跳过 [temp, tmp, ., ~$] 开头的目录和文件
-        tail = os.path.basename(path).lower()
-        flag = False
-        for x in ["temp", "tmp", ".", "~$"]:
-            if tail.startswith(x):
-                flag = True
-                break
-        return flag
-
     doc_path = get_doc_path(kb_name)
     result = []
-    for root, _, files in os.walk(doc_path):
-        if is_skiped_path(root):
-            continue
-        for file in files:
-            if is_skiped_path(file):
-                continue
-            path = Path(doc_path) / root / file
-            result.append(path.resolve().relative_to(doc_path).as_posix())
+
+    def is_skiped_path(path: str):
+        tail = os.path.basename(path).lower()
+        for x in ["temp", "tmp", ".", "~$"]:
+            if tail.startswith(x):
+                return True
+        return False
+
+    def process_entry(entry):
+        if is_skiped_path(entry.path):
+            return
+
+        if entry.is_symlink():
+            target_path = os.path.realpath(entry.path)
+            with os.scandir(target_path) as target_it:
+                for target_entry in target_it:
+                    process_entry(target_entry)
+        elif entry.is_file():
+            file_path = (Path(os.path.relpath(entry.path, doc_path)).as_posix()) # 路径统一为 posix 格式
+            result.append(file_path)
+        elif entry.is_dir():
+            with os.scandir(entry.path) as it:
+                for sub_entry in it:
+                    process_entry(sub_entry)
+
+    with os.scandir(doc_path) as it:
+        for entry in it:
+            process_entry(entry)
 
     return result
 
 
 LOADER_DICT = {"UnstructuredHTMLLoader": ['.html'],
+               "MHTMLLoader": ['.mhtml'],
                # "UnstructuredMarkdownLoader": ['.md'],
                "CustomMDLoader": ['.md'],
                "JSONLoader": [".json"],
@@ -88,7 +100,7 @@ LOADER_DICT = {"UnstructuredHTMLLoader": ['.html'],
                "RapidOCRLoader": ['.png', '.jpg', '.jpeg', '.bmp'],
                "UnstructuredEmailLoader": ['.eml', '.msg'],
                "UnstructuredEPubLoader": ['.epub'],
-               "UnstructuredExcelLoader": ['.xlsx', '.xlsd'],
+               "UnstructuredExcelLoader": ['.xlsx', '.xls', '.xlsd'],
                "NotebookLoader": ['.ipynb'],
                "UnstructuredODTLoader": ['.odt'],
                "PythonLoader": ['.py'],
@@ -97,12 +109,23 @@ LOADER_DICT = {"UnstructuredHTMLLoader": ['.html'],
                "SRTLoader": ['.srt'],
                "TomlLoader": ['.toml'],
                "UnstructuredTSVLoader": ['.tsv'],
-               "UnstructuredWordDocumentLoader": ['.docx', 'doc'],
+               "UnstructuredWordDocumentLoader": ['.docx', '.doc'],
                "UnstructuredXMLLoader": ['.xml'],
                "UnstructuredPowerPointLoader": ['.ppt', '.pptx'],
+               "EverNoteLoader": ['.enex'],
                "UnstructuredFileLoader": ['.txt'],
                }
 SUPPORTED_EXTS = [ext for sublist in LOADER_DICT.values() for ext in sublist]
+
+
+# patch json.dumps to disable ensure_ascii
+def _new_json_dumps(obj, **kwargs):
+    kwargs["ensure_ascii"] = False
+    return _origin_json_dumps(obj, **kwargs)
+
+if json.dumps is not _new_json_dumps:
+    _origin_json_dumps = json.dumps
+    json.dumps = _new_json_dumps
 
 
 class JSONLinesLoader(langchain.document_loaders.JSONLoader):
@@ -245,7 +268,7 @@ def make_text_splitter(
         print(e)
         text_splitter_module = importlib.import_module('langchain.text_splitter')
         TextSplitter = getattr(text_splitter_module, "RecursiveCharacterTextSplitter")
-        text_splitter = TextSplitter(chunk_size=250, chunk_overlap=50)
+        text_splitter = TextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     return text_splitter
 
 
@@ -260,7 +283,7 @@ class KnowledgeFile:
         对应知识库目录中的文件，必须是磁盘上存在的才能进行向量化等操作。
         '''
         self.kb_name = knowledge_base_name
-        self.filename = filename
+        self.filename = str(Path(filename).as_posix())
         self.ext = os.path.splitext(filename)[-1].lower()
         if self.ext not in SUPPORTED_EXTS:
             raise ValueError(f"暂未支持的文件格式 {self.filename}")
@@ -298,12 +321,11 @@ class KnowledgeFile:
                                                    chunk_overlap=chunk_overlap, metadata=docs[0].metadata)
             if self.text_splitter_name == "MarkdownHeaderTextSplitter" or self.text_splitter_name == "CustomMarkDownTextSplitter":
                 docs = text_splitter.split_text(docs[0].page_content)
-                # for doc in docs:
-                #     # 如果文档有元数据
-                #     if doc.metadata:
-                #         doc.metadata["source"] = os.path.basename(self.filepath)
             else:
                 docs = text_splitter.split_documents(docs)
+
+        if not docs:
+            return []
 
         print(f"文档切分示例：{docs[0]}")
         if zh_title_enhance:

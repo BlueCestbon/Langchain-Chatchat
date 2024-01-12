@@ -6,7 +6,7 @@ from server.agent.callbacks import CustomAsyncIteratorCallbackHandler, Status
 from langchain.agents import LLMSingleActionAgent, AgentExecutor
 from server.agent.custom_template import CustomOutputParser, CustomPromptTemplate
 from fastapi import Body
-from fastapi.responses import StreamingResponse
+from sse_starlette.sse import EventSourceResponse
 from configs import LLM_MODELS, TEMPERATURE, HISTORY_LEN, Agent_MODEL
 from server.utils import wrap_done, get_ChatOpenAI, get_prompt_template
 from langchain.chains import LLMChain
@@ -43,7 +43,11 @@ async def agent_chat(query: str = Body(..., description="用户输入", examples
             model_name: str = LLM_MODELS[0],
             prompt_name: str = prompt_name,
     ) -> AsyncIterable[str]:
+        nonlocal max_tokens
         callback = CustomAsyncIteratorCallbackHandler()
+        if isinstance(max_tokens, int) and max_tokens <= 0:
+            max_tokens = None
+
         model = get_ChatOpenAI(
             model_name=model_name,
             temperature=temperature,
@@ -176,8 +180,8 @@ async def agent_chat(query: str = Body(..., description="用户输入", examples
             yield json.dumps({"answer": answer, "final_answer": final_answer}, ensure_ascii=False)
         await task
 
-    return StreamingResponse(agent_chat_iterator(query=query,
+    return EventSourceResponse(agent_chat_iterator(query=query,
                                                  history=history,
                                                  model_name=model_name,
                                                  prompt_name=prompt_name),
-                             media_type="text/event-stream")
+                             )

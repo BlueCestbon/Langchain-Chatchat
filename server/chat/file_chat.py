@@ -1,5 +1,5 @@
 from fastapi import Body, File, Form, UploadFile
-from fastapi.responses import StreamingResponse
+from sse_starlette.sse import EventSourceResponse
 from configs import (LLM_MODELS, VECTOR_SEARCH_TOP_K, SCORE_THRESHOLD, TEMPERATURE,
                      CHUNK_SIZE, OVERLAP_SIZE, ZH_TITLE_ENHANCE)
 from server.utils import (wrap_done, get_ChatOpenAI,
@@ -37,6 +37,9 @@ def _parse_files_in_thread(
             filename = file.filename
             file_path = os.path.join(dir, filename)
             file_content = file.file.read()  # 读取上传文件的内容
+
+            if not os.path.isdir(os.path.dirname(file_path)):
+                os.makedirs(os.path.dirname(file_path))
             with open(file_path, "wb") as f:
                 f.write(file_content)
             kb_file = KnowledgeFile(filename=filename, knowledge_base_name="temp")
@@ -110,7 +113,11 @@ async def file_chat(query: str = Body(..., description="用户输入", examples=
     history = [History.from_data(h) for h in history]
 
     async def knowledge_base_chat_iterator() -> AsyncIterable[str]:
+        nonlocal max_tokens
         callback = AsyncIteratorCallbackHandler()
+        if isinstance(max_tokens, int) and max_tokens <= 0:
+            max_tokens = None
+
         model = get_ChatOpenAI(
             model_name=model_name,
             temperature=temperature,
@@ -118,14 +125,14 @@ async def file_chat(query: str = Body(..., description="用户输入", examples=
             callbacks=[callback],
         )
         embed_func = EmbeddingsFunAdapter()
-        embeddings = embed_func.embed_query(query)
+        embeddings = await embed_func.aembed_query(query)
         with memo_faiss_pool.acquire(knowledge_id) as vs:
             docs = vs.similarity_search_with_score_by_vector(embeddings, k=top_k, score_threshold=score_threshold)
             docs = [x[0] for x in docs]
 
         context = "\n".join([doc.page_content for doc in docs])
         if len(docs) == 0: ## 如果没有找到相关文档，使用Empty模板
-            prompt_template = get_prompt_template("knowledge_base_chat", "Empty")
+            prompt_template = get_prompt_template("knowledge_base_chat", "empty")
         else:
             prompt_template = get_prompt_template("knowledge_base_chat", prompt_name)
         input_msg = History(role="user", content=prompt_template).to_msg_template(False)
@@ -141,9 +148,8 @@ async def file_chat(query: str = Body(..., description="用户输入", examples=
         )
 
         source_documents = []
-        doc_path = get_temp_dir(knowledge_id)[0]
         for inum, doc in enumerate(docs):
-            filename = Path(doc.metadata["source"]).resolve().relative_to(doc_path)
+            filename = doc.metadata.get("source")
             text = f"""出处 [{inum + 1}] [{filename}] \n\n{doc.page_content}\n\n"""
             source_documents.append(text)
 
@@ -164,4 +170,4 @@ async def file_chat(query: str = Body(..., description="用户输入", examples=
                              ensure_ascii=False)
         await task
 
-    return StreamingResponse(knowledge_base_chat_iterator(), media_type="text/event-stream")
+    return EventSourceResponse(knowledge_base_chat_iterator())

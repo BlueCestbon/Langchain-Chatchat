@@ -13,7 +13,6 @@ from fastapi import Body
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import RedirectResponse
 from server.chat.chat import chat
-from server.chat.openai_chat import openai_chat
 from server.chat.search_engine_chat import search_engine_chat
 from server.chat.completion import completion
 from server.chat.feedback import chat_feedback
@@ -59,11 +58,6 @@ def mount_app_routes(app: FastAPI, run_mode: str = None):
             summary="swagger 文档")(document)
 
     # Tag: Chat
-    app.post("/chat/fastchat",
-             tags=["Chat"],
-             summary="与llm模型对话(直接与fastchat api对话)",
-             )(openai_chat)
-
     app.post("/chat/chat",
              tags=["Chat"],
              summary="与llm模型对话(通过LLMChain)",
@@ -81,6 +75,8 @@ def mount_app_routes(app: FastAPI, run_mode: str = None):
 
     # 知识库相关接口
     mount_knowledge_routes(app)
+    # 摘要相关接口
+    mount_filename_summary_routes(app)
 
     # LLM模型相关接口
     app.post("/llm_model/list_running_models",
@@ -147,7 +143,8 @@ def mount_knowledge_routes(app: FastAPI):
     from server.knowledge_base.kb_api import list_kbs, create_kb, delete_kb
     from server.knowledge_base.kb_doc_api import (list_files, upload_docs, delete_docs,
                                                 update_docs, download_doc, recreate_vector_store,
-                                                search_docs, DocumentWithScore, update_info)
+                                                search_docs, DocumentWithVSId, update_info,
+                                                update_docs_by_id,)
 
     app.post("/chat/knowledge_base_chat",
              tags=["Chat"],
@@ -188,9 +185,16 @@ def mount_knowledge_routes(app: FastAPI):
 
     app.post("/knowledge_base/search_docs",
              tags=["Knowledge Base Management"],
-             response_model=List[DocumentWithScore],
+             response_model=List[DocumentWithVSId],
              summary="搜索知识库"
              )(search_docs)
+
+    app.post("/knowledge_base/update_docs_by_id",
+             tags=["Knowledge Base Management"],
+             response_model=BaseResponse,
+             summary="直接更新知识库文档"
+             )(update_docs_by_id)
+
 
     app.post("/knowledge_base/upload_docs",
              tags=["Knowledge Base Management"],
@@ -228,6 +232,26 @@ def mount_knowledge_routes(app: FastAPI):
              tags=["Knowledge Base Management"],
              summary="上传文件到临时目录，用于文件对话。"
              )(upload_temp_docs)
+
+
+def mount_filename_summary_routes(app: FastAPI):
+    from server.knowledge_base.kb_summary_api import (summary_file_to_vector_store, recreate_summary_vector_store,
+                                                      summary_doc_ids_to_vector_store)
+
+    app.post("/knowledge_base/kb_summary_api/summary_file_to_vector_store",
+             tags=["Knowledge kb_summary_api Management"],
+             summary="单个知识库根据文件名称摘要"
+             )(summary_file_to_vector_store)
+    app.post("/knowledge_base/kb_summary_api/summary_doc_ids_to_vector_store",
+             tags=["Knowledge kb_summary_api Management"],
+             summary="单个知识库根据doc_ids摘要",
+             response_model=BaseResponse,
+             )(summary_doc_ids_to_vector_store)
+    app.post("/knowledge_base/kb_summary_api/recreate_summary_vector_store",
+             tags=["Knowledge kb_summary_api Management"],
+             summary="重建单个知识库文件摘要"
+             )(recreate_summary_vector_store)
+
 
 
 def run_api(host, port, **kwargs):
