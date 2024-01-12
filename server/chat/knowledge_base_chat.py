@@ -1,3 +1,5 @@
+import operator
+
 from fastapi import Body, Request
 from fastapi.responses import StreamingResponse
 from configs import (LLM_MODELS, VECTOR_SEARCH_TOP_K, SCORE_THRESHOLD, TEMPERATURE)
@@ -41,7 +43,7 @@ async def knowledge_base_chat(query: str = Body(..., description="用户输入",
     # top_k = VECTOR_SEARCH_TOP_K
     # score_threshold = SCORE_THRESHOLD
     # model_name = LLM_MODEL
-    # temperature = TEMPERATURE
+    temperature = 0.4
     # prompt_name = "default"
 
     kb = KBServiceFactory.get_service_by_name(knowledge_base_name)
@@ -49,6 +51,21 @@ async def knowledge_base_chat(query: str = Body(..., description="用户输入",
         return BaseResponse(code=404, msg=f"未找到知识库 {knowledge_base_name}")
 
     history = [History.from_data(h) for h in history]
+
+    def u_sort(lst):
+        # 按照从小到大的顺序排序
+        lst.sort()
+        total = len(lst)
+        middle = total // 2
+
+        result = [0] * len(lst)
+        # 最中间的是最大的元素
+        result[middle] = lst[-1]
+        for i in range(middle):
+            result[i] = lst[i + 1 * i]
+            result[total - i - 1] = lst[i + 1 * i + 1]
+
+        return result
 
     async def knowledge_base_chat_iterator(query: str,
                                            top_k: int,
@@ -64,8 +81,24 @@ async def knowledge_base_chat(query: str = Body(..., description="用户输入",
             callbacks=[callback],
         )
         docs = search_docs(query, knowledge_base_name, top_k, score_threshold)
-        context = "\n".join([doc.page_content for doc in docs])
-        if len(docs) == 0: ## 如果没有找到相关文档，使用Empty模板
+
+        if len(docs) > 0:
+            scores = [obj.score for obj in docs]
+            sort_scores = u_sort(scores)
+            print(sort_scores)
+
+            sorted_docs = []
+            for i in range(len(sort_scores)):
+                for j in range(len(docs)):
+                    if sort_scores[i] == docs[j].score:
+                        sorted_docs.append(docs[j])
+
+        # 主观效果不佳，所以改回去了
+        sorted_docs = docs
+
+
+        context = "\n".join([doc.page_content for doc in sorted_docs])
+        if len(sorted_docs) == 0: ## 如果没有找到相关文档，使用Empty模板
             prompt_template = get_prompt_template("knowledge_base_chat", "Empty")
         else:
             prompt_template = get_prompt_template("knowledge_base_chat", prompt_name)
@@ -83,12 +116,19 @@ async def knowledge_base_chat(query: str = Body(..., description="用户输入",
 
         source_documents = []
         doc_path = get_doc_path(knowledge_base_name)
-        for inum, doc in enumerate(docs):
-            filename = Path(doc.metadata["source"]).resolve().relative_to(doc_path)
-            parameters = urlencode({"knowledge_base_name": knowledge_base_name, "file_name":filename})
+        for inum, doc in enumerate(sorted_docs):
+            # print("doc.metadata[\"source\"] :", doc.metadata["source"])
+            # print("doc_path", doc_path)
+            # print("doc.metadata[\"source\"] resolve: ", Path(doc.metadata["source"]).resolve())
+            # print("\n\n\n\n")
+
+            # filename = Path(doc.metadata["source"]).resolve().relative_to(doc_path)
+            filename = doc.metadata["source"]
+            parameters = urlencode({"knowledge_base_name": knowledge_base_name, "file_name": filename})
             base_url = request.base_url
             url = f"{base_url}knowledge_base/download_doc?" + parameters
-            text = f"""出处 [{inum + 1}] [{filename}]({url}) \n\n{doc.page_content}\n\n"""
+            # text = f"""出处 [{inum + 1}] [{filename}]({url}) \n\n{doc.page_content}\n\n"""
+            text = f"""出处 [{inum + 1}] [{filename[str(filename).rfind("/")+1:]}] [distance={doc.score}] \n\n{doc.page_content}\n\n"""
             source_documents.append(text)
 
         if len(source_documents) == 0: # 没有找到相关文档

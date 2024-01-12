@@ -1,4 +1,7 @@
 import os
+
+from pydantic import Field
+
 from configs import (
     KB_ROOT_PATH,
     CHUNK_SIZE,
@@ -167,6 +170,7 @@ def make_text_splitter(
         chunk_size: int = CHUNK_SIZE,
         chunk_overlap: int = OVERLAP_SIZE,
         llm_model: str = LLM_MODELS[0],
+        metadata: dict = Field(default_factory=dict)
 ):
     """
     根据参数获取特定的分词器
@@ -181,7 +185,7 @@ def make_text_splitter(
             headers_to_split_on = text_splitter_dict[splitter_name]['headers_to_split_on']
             from text_splitter.custom_md_text_splitter import CustomMarkDownTextSplitter
             text_splitter = CustomMarkDownTextSplitter(
-                headers_to_split_on=headers_to_split_on)
+                headers_to_split_on=headers_to_split_on, metadata=metadata)
         else:
 
             try:  ## 优先使用用户自定义的text_splitter
@@ -291,13 +295,13 @@ class KnowledgeFile:
         if self.ext not in [".csv"]:
             if text_splitter is None:
                 text_splitter = make_text_splitter(splitter_name=self.text_splitter_name, chunk_size=chunk_size,
-                                                   chunk_overlap=chunk_overlap)
-            if self.text_splitter_name == "MarkdownHeaderTextSplitter":
+                                                   chunk_overlap=chunk_overlap, metadata=docs[0].metadata)
+            if self.text_splitter_name == "MarkdownHeaderTextSplitter" or self.text_splitter_name == "CustomMarkDownTextSplitter":
                 docs = text_splitter.split_text(docs[0].page_content)
-                for doc in docs:
-                    # 如果文档有元数据
-                    if doc.metadata:
-                        doc.metadata["source"] = os.path.basename(self.filepath)
+                # for doc in docs:
+                #     # 如果文档有元数据
+                #     if doc.metadata:
+                #         doc.metadata["source"] = os.path.basename(self.filepath)
             else:
                 docs = text_splitter.split_documents(docs)
 

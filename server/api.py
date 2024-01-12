@@ -29,7 +29,7 @@ nltk.data.path = [NLTK_DATA_PATH] + nltk.data.path
 
 
 async def document():
-    return RedirectResponse(url="/docs")
+    return RedirectResponse(url="/ontoweb")
 
 
 def create_app(run_mode: str = None):
@@ -54,7 +54,7 @@ def create_app(run_mode: str = None):
 
 
 def mount_app_routes(app: FastAPI, run_mode: str = None):
-    app.get("/",
+    app.get("/dodoc",
             response_model=BaseResponse,
             summary="swagger 文档")(document)
 

@@ -10,24 +10,41 @@ DEFAULT_VS_TYPE = "milvus"
 # 缓存向量库数量（针对FAISS）
 CACHED_VS_NUM = 1
 
+# 缓存临时向量库数量（针对FAISS），用于文件对话
+CACHED_MEMO_VS_NUM = 10
+
 # 知识库中单段文本长度(不适用MarkdownHeaderTextSplitter)
-CHUNK_SIZE = 400
+CHUNK_SIZE = 512
 
 # 知识库中相邻文本重合长度(不适用MarkdownHeaderTextSplitter)
-OVERLAP_SIZE = 50
+OVERLAP_SIZE = 0
 
 # 知识库匹配向量数量
-VECTOR_SEARCH_TOP_K = 6
+VECTOR_SEARCH_TOP_K = 4
 
 # 知识库匹配相关度阈值，取值范围在0-1之间，SCORE越小，相关度越高，取到1相当于不筛选，建议设置在0.5左右
-SCORE_THRESHOLD = 0.9
+SCORE_THRESHOLD = 1
 
 # 默认搜索引擎。可选：bing, duckduckgo, metaphor
 DEFAULT_SEARCH_ENGINE = "duckduckgo"
+
 # 搜索引擎匹配结题数量
 SEARCH_ENGINE_TOP_K = 3
+
+
+# Bing 搜索必备变量
+# 使用 Bing 搜索需要使用 Bing Subscription Key,需要在azure port中申请试用bing search
+# 具体申请方式请见
+# https://learn.microsoft.com/en-us/bing/search-apis/bing-web-search/create-bing-search-service-resource
+# 使用python创建bing api 搜索实例详见:
+# https://learn.microsoft.com/en-us/bing/search-apis/bing-web-search/quickstarts/rest/python
 BING_SEARCH_URL = "https://api.bing.microsoft.com/v7.0/search"
+# 注意不是bing Webmaster Tools的api key，
+
+# 此外，如果是在服务器上，报Failed to establish a new connection: [Errno 110] Connection timed out
+# 是因为服务器加了防火墙，需要联系管理员加白名单，如果公司的服务器的话，就别想了GG
 BING_SUBSCRIPTION_KEY = ""
+
 # metaphor搜索需要KEY
 METAPHOR_API_KEY = ""
 
@@ -43,10 +60,13 @@ KB_INFO = {
     "知识库名称": "知识库介绍",
     "samples": "关于本项目issue的解答",
 }
+
+
 # 通常情况下不需要更改以下内容
+
 # 知识库默认存储路径
-# KB_ROOT_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "knowledge_base")
-KB_ROOT_PATH = "/mnt/Lchat/knowledge_base"
+KB_ROOT_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "knowledge_base")
+# KB_ROOT_PATH = "/mnt/22xiaowei/Lchat/knowledge_base"
 if not os.path.exists(KB_ROOT_PATH):
     os.mkdir(KB_ROOT_PATH)
 # 数据库默认存储路径。
@@ -59,10 +79,11 @@ kbs_config = {
     "faiss": {
     },
     "milvus": {
-        "host": "milvus-standalone",
+        "host": "10.10.10.2",
+        # "host": "202.114.252.2",
         "port": "19530",
-        "user": "",
-        "password": "",
+        "user": "root",
+        "password": "Ontoweb@2023",
         "secure": False,
     }
 }
@@ -105,6 +126,7 @@ text_splitter_dict = {
 
 # TEXT_SPLITTER 名称
 TEXT_SPLITTER_NAME = "CustomMarkDownTextSplitter"
+# TEXT_SPLITTER_NAME = "ChineseRecursiveTextSplitter"
 
 # Embedding模型定制词语的词表文件
 EMBEDDING_KEYWORD_FILE = "embedding_keywords.txt"

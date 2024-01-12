@@ -1,14 +1,20 @@
 from typing import List, Dict, Optional
 
+from langchain.chains import LLMChain
+from langchain.prompts import ChatPromptTemplate, HumanMessagePromptTemplate
 from langchain.schema import Document
 from langchain.vectorstores.milvus import Milvus
 
-from configs import kbs_config
+from configs import kbs_config, LLM_MODELS, TEMPERATURE, GET_KEY_FILENAME_PROMPT
 
 from server.knowledge_base.kb_service.base import KBService, SupportedVSType, EmbeddingsFunAdapter, \
     score_threshold_process
 from server.knowledge_base.utils import KnowledgeFile
 
+import logging
+from langchain.chat_models import ChatOpenAI
+from langchain.schema import HumanMessage
+from server.utils import get_ChatOpenAI
 
 class MilvusKBService(KBService):
     milvus: Milvus
@@ -62,7 +68,39 @@ class MilvusKBService(KBService):
         self._load_milvus()
         embed_func = EmbeddingsFunAdapter(self.embed_model)
         embeddings = embed_func.embed_query(query)
-        docs = self.milvus.similarity_search_with_score_by_vector(embeddings, top_k)
+
+        logging.info(f"针对 {query} 使用LLM来获得所属文件的关键信息")
+        # keyword_filename = "安全会议管理"  # 这个值是大模型从query里提取出来的文件名
+        model = get_ChatOpenAI(
+            model_name=LLM_MODELS[0],
+            temperature=1e-8,
+        )
+        human_prompt = GET_KEY_FILENAME_PROMPT.format(query=query)
+        chat_prompt = ChatPromptTemplate.from_messages([human_prompt])
+        chain = LLMChain(prompt=chat_prompt, llm=model, verbose=True)
+        response_key = chain({"query": query})
+        try:
+            keyword_filename = response_key["text"]
+        except Exception as e:
+            logging.error(f"异常 {e}")
+            keyword_filename = "NULL"
+        logging.info(f"{query} 获取到的关键信息是 {keyword_filename}")
+
+        # 判断元数据 key_filename 是不是在用户输入中出现过，出现过那就缩小范围，没出现那就像之前一样全库搜索
+        # 定义一个布尔表达式，用于过滤出出现 key_filename 的记录
+        expr = f"key_filename in ['{keyword_filename}']"
+
+        # key_filename in ['安全测试管理']
+        try:
+            docs = self.milvus.similarity_search_with_score_by_vector(embeddings, top_k, expr=expr)
+            _ = docs[0]
+            logging.info(f"expr:{expr} 检索出来的docs[0](total={len(docs)}):{_}")
+        except Exception as e:
+            # 如果异常或者没匹配到，那就全库搜索
+            logging.error(f"根据 keyword_filename {keyword_filename} 查询文件出现异常，没查询到符合的文档 {e}")
+            docs = self.milvus.similarity_search_with_score_by_vector(embeddings, top_k)
+
+
         return score_threshold_process(score_threshold, top_k, docs)
 
     def do_add_doc(self, docs: List[Document], **kwargs) -> List[Dict]:

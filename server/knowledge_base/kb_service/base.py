@@ -77,6 +77,9 @@ class KBService(ABC):
         """
         if not os.path.exists(self.doc_path):
             os.makedirs(self.doc_path)
+            tmp_doc_path = self.doc_path
+            # 用来放临时分块的txt
+            os.makedirs(tmp_doc_path.replace("content", "split_txt"))
         self.do_create_kb()
         status = add_kb_to_db(self.kb_name, self.kb_info, self.vs_type(), self.embed_model)
         return status

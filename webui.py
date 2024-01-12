@@ -15,14 +15,9 @@ if __name__ == "__main__":
     is_lite = "lite" in sys.argv
 
     st.set_page_config(
-        "Langchain-Chatchat WebUI",
+        "Ontoweb WebUI",
         os.path.join("img", "chatchat_icon_blue_square_v2.png"),
         initial_sidebar_state="expanded",  # expanded, collapsed, auto
-        menu_items={
-            'Get Help': 'https://github.com/chatchat-space/Langchain-Chatchat',
-            'Report a bug': "https://github.com/chatchat-space/Langchain-Chatchat/issues",
-            'About': f"""欢迎使用 Langchain-Chatchat WebUI {VERSION}！"""
-        }
     )
 
     pages = {
@@ -49,10 +44,10 @@ if __name__ == "__main__":
             ),
             use_column_width=True
         )
-        st.caption(
-            f"""<p align="right">当前版本：{VERSION}</p>""",
-            unsafe_allow_html=True,
-        )
+      #  st.caption(
+      #      f"""<p align="right">当前版本：{VERSION}</p>""",
+      #      unsafe_allow_html=True,
+      #  )
         options = list(pages)
         icons = [x["icon"] for x in pages.values()]
 

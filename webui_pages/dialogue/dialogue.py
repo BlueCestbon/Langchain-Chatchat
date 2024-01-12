@@ -120,7 +120,7 @@ def dialogue_page(api: ApiRequest, is_lite: bool = False):
                                      key="llm_model",
                                      )
         else:
-            llm_model = LLM_MODEL
+            llm_model = LLM_MODELS[0]
         if (st.session_state.get("prev_llm_model") != llm_model
                 and not is_lite
                 and not llm_model in config_models.get("online", {})
@@ -151,14 +151,17 @@ def dialogue_page(api: ApiRequest, is_lite: bool = False):
             text = f"已切换为 {prompt_template_name} 模板。"
             st.toast(text)
 
-        prompt_template_select = st.selectbox(
-            "请选择Prompt模板：",
-            prompt_templates_kb_list,
-            index=0,
-            on_change=prompt_change,
-            key="prompt_template_select",
-        )
-        prompt_template_name = st.session_state.prompt_template_select
+        if HASADMIN:  # admin可选
+            prompt_template_select = st.selectbox(
+                "请选择Prompt模板：",
+                prompt_templates_kb_list,
+                index=0,
+                on_change=prompt_change,
+                key="prompt_template_select",
+            )
+            prompt_template_name = st.session_state.prompt_template_select
+        else:
+            prompt_template_name = "default"
         if HASADMIN:  # admin可选
             temperature = st.slider("Temperature：", 0.0, 1.0, TEMPERATURE, 0.05)
             history_len = st.number_input("历史对话轮数：", 0, 20, HISTORY_LEN)

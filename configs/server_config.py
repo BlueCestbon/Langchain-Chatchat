@@ -91,10 +91,18 @@ FSCHAT_MODEL_WORKERS = {
         # 'disable_log_requests': False
 
     },
-    # 可以如下示例方式更改默认配置
-    # "baichuan-7b": { # 使用default中的IP和端口
-    #    "device": "cpu",
-    # },
+     "Qwen-72B-Chat": { # 使用default中的IP和端口
+        "port": 21001,
+     },
+     "Baichuan2-13B-Chat": { # 使用default中的IP和端口
+        "port": 21002,
+     },
+     "Llama2-Chinese-13b-Chat-ms": { # 使用default中的IP和端口
+        "port": 21003,
+     },
+     "chatglm3-6b": { # 使用default中的IP和端口
+        "port": 21004,
+     },
 }
 
 # fastchat multi model worker server
